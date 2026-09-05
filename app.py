@@ -1615,8 +1615,7 @@ async def analyze(
         }
 
 
-    file_bytes =
-        await file.read()
+file_bytes = await file.read()
 
 
     if len(file_bytes) > 8 * 1024 * 1024:
@@ -1634,8 +1633,7 @@ async def analyze(
 
     try:
 
-        patient_data =
-            json.loads(patient)
+       patient_data = json.loads(patient)
 
     except Exception:
 
@@ -1834,15 +1832,11 @@ Do not wrap the JSON in markdown.
     try:
 
         response = requests.post(
-
-            "https://openrouter.ai/api/v1/chat/completions",
-
-            headers=headers,
-
-            json=payload,
-
-            timeout=120
-        )
+    "https://openrouter.ai/api/v1/chat/completions",
+    headers=headers,
+    json=payload,
+    timeout=120
+)
 
 
         if not response.ok:
@@ -1858,15 +1852,10 @@ Do not wrap the JSON in markdown.
             }
 
 
-        result =
-            response.json()
+        result = response.json()
 
 
-        choices =
-            result.get(
-                "choices",
-                []
-            )
+        choices = result.get("choices", [])
 
 
         if not choices:
@@ -1878,18 +1867,10 @@ Do not wrap the JSON in markdown.
             }
 
 
-        message =
-            choices[0].get(
-                "message",
-                {}
-            )
+        message = choices[0].get("message", {})
 
 
-        content =
-            message.get(
-                "content",
-                ""
-            )
+        content = message.get("content", "")
 
 
         # Some models can return content as a list
@@ -1929,18 +1910,12 @@ Do not wrap the JSON in markdown.
             str(content)
 
 
-        cleaned =
-            clean_json_text(
-                content
-            )
+        cleaned = clean_json_text(content)
 
 
         try:
 
-            parsed =
-                json.loads(
-                    cleaned
-                )
+            parsed = json.loads(cleaned)
 
         except Exception:
 
