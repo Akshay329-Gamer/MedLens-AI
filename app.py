@@ -546,9 +546,10 @@ or "Not provided".
     encoded = base64.b64encode(data).decode("utf-8")
 
 
+    # Gemini model updated for new users
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-2.5-flash:generateContent?key="
+        "gemini-3.6-flash:generateContent?key="
         + api_key
     )
 
@@ -580,8 +581,6 @@ or "Not provided".
 
         "generationConfig": {
 
-            "temperature": 0.1,
-
             "responseMimeType": "application/json"
 
         }
@@ -598,7 +597,6 @@ or "Not provided".
         )
 
 
-        # Show the real Gemini API error instead of hiding it.
         if not r.ok:
 
             return {
