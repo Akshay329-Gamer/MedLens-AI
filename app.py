@@ -1448,7 +1448,7 @@ Do not wrap the JSON in markdown.
     payload={
 
         "model":
-    "google/gemma-4-26b-a4b-it:free",
+    "minimax/minimax-m3:free",
 
         "messages":[
 
