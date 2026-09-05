@@ -81,3 +81,51 @@ Structured JSON
   +----> Conflict Detection
   |
   +----> Patient-Friendly Summary
+```
+## Responsible AI
+
+MedLens is designed as an information-structuring and review-support tool.
+
+It does not:
+
+- Provide medical diagnosis
+- Prescribe treatment
+- Recommend medication changes
+- Determine medication dosage
+- Invent laboratory reference ranges
+- Present uncertain information as fact
+
+AI-extracted information should be reviewed by a qualified human before clinical use.
+
+## Assumptions
+
+- Uploaded reports are assumed to contain the source information required for extraction.
+- Reference ranges are used only when explicitly available in the uploaded report.
+- AI extraction may contain errors and requires human verification.
+- The system is intended for information organization and review support, not autonomous clinical decision-making.
+
+## Deployment
+
+MedLens is containerized using Docker and deployed as a web service on Render.
+
+The OpenRouter API key is stored as a server-side environment variable and is not included in the source code.
+
+## Security
+
+- API credentials are stored using environment variables.
+- `.env` files are excluded using `.gitignore`.
+- Uploaded files are processed in memory and are not intentionally persisted by the application.
+- File type and file-size limits are enforced by the backend.
+
+## Limitations
+
+- AI extraction may contain errors, especially with low-quality or difficult-to-read documents.
+- Results should be verified against the original uploaded report.
+- The application does not replace professional medical review.
+- No diagnosis or treatment recommendation is generated.
+
+## Project
+
+Built for the PromptWars × AIMERverse hackathon at MVSR Engineering College.
+
+**Challenge:** MedLens — AI Clinical Insight
