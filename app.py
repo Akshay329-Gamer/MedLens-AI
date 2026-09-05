@@ -1,461 +1,559 @@
 import os
 import json
 import base64
+import re
 import requests
+
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="MedLens")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="MedLens — AI Clinical Insight")
+
+
+# ============================================================
+# MEDLENS UI
+# ============================================================
 
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>MedLens — Clinical Information Intelligence</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedLens — Clinical Insight</title>
 
-<style>
-*{box-sizing:border-box}
+    <style>
+        * {
+            box-sizing: border-box;
+        }
 
-body{
-    margin:0;
-    font-family:Arial,sans-serif;
-    background:#f4f7fb;
-    color:#172033
-}
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f7fb;
+            color: #172033;
+        }
 
-header{
-    background:#102a43;
-    color:white;
-    padding:22px 7%;
-    display:flex;
-    justify-content:space-between;
-    align-items:center
-}
+        .header {
+            background: #102a43;
+            color: white;
+            padding: 28px 20px;
+        }
 
-.logo{
-    font-size:26px;
-    font-weight:700
-}
+        .header-inner {
+            max-width: 1100px;
+            margin: auto;
+        }
 
-.tag{
-    opacity:.8
-}
+        .header h1 {
+            margin: 0;
+            font-size: 34px;
+        }
 
-main{
-    max-width:1150px;
-    margin:35px auto;
-    padding:0 20px
-}
+        .header p {
+            margin: 8px 0 0;
+            opacity: 0.85;
+        }
 
-.card{
-    background:white;
-    border-radius:18px;
-    padding:25px;
-    margin-bottom:22px;
-    box-shadow:0 5px 25px #102a4312
-}
+        .container {
+            max-width: 1100px;
+            margin: 25px auto;
+            padding: 0 15px;
+        }
 
-h1{
-    margin-bottom:5px
-}
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.07);
+        }
 
-h2{
-    margin-top:0
-}
+        .card h2 {
+            margin-top: 0;
+            color: #102a43;
+        }
 
-.grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:15px
-}
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
 
-input,textarea{
-    width:100%;
-    padding:12px;
-    border:1px solid #d5dde8;
-    border-radius:9px;
-    margin-top:6px
-}
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
 
-textarea{
-    min-height:90px
-}
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccd6e0;
+            border-radius: 8px;
+            font-size: 15px;
+        }
 
-button{
-    background:#2563eb;
-    color:white;
-    border:0;
-    border-radius:9px;
-    padding:13px 22px;
-    font-weight:bold;
-    cursor:pointer;
-    margin-top:15px
-}
+        textarea {
+            min-height: 85px;
+            resize: vertical;
+        }
 
-button:hover{
-    opacity:.9
-}
+        .full {
+            grid-column: 1 / -1;
+        }
 
-.upload{
-    border:2px dashed #9bb7dc;
-    padding:30px;
-    text-align:center;
-    border-radius:14px
-}
+        .upload {
+            border: 2px dashed #7ba7d9;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            background: #f8fbff;
+        }
 
-table{
-    width:100%;
-    border-collapse:collapse;
-    margin-top:15px
-}
+        button {
+            margin-top: 18px;
+            background: #1565c0;
+            color: white;
+            border: none;
+            padding: 14px 22px;
+            border-radius: 9px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
-th,td{
-    padding:13px;
-    border-bottom:1px solid #e5eaf0;
-    text-align:left
-}
+        button:hover {
+            background: #0d47a1;
+        }
 
-.badge{
-    padding:5px 10px;
-    border-radius:20px;
-    font-weight:bold;
-    font-size:12px
-}
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
 
-.low{
-    background:#fee2e2;
-    color:#b91c1c
-}
+        .status {
+            margin-top: 15px;
+            font-weight: bold;
+        }
 
-.high{
-    background:#ffedd5;
-    color:#c2410c
-}
+        .table-wrap {
+            overflow-x: auto;
+        }
 
-.normal{
-    background:#dcfce7;
-    color:#15803d
-}
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
 
-.unknown{
-    background:#e5e7eb;
-    color:#374151
-}
+        th, td {
+            padding: 11px;
+            border: 1px solid #d8e0e8;
+            text-align: left;
+            vertical-align: top;
+        }
 
-.source{
-    font-size:12px;
-    color:#64748b
-}
+        th {
+            background: #edf3f8;
+        }
 
-.alert{
-    background:#fff7ed;
-    border-left:5px solid #f97316;
-    padding:15px;
-    border-radius:8px
-}
+        .badge {
+            display: inline-block;
+            padding: 5px 9px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
 
-.summary{
-    background:#eff6ff;
-    padding:20px;
-    border-radius:12px;
-    line-height:1.6
-}
+        .low {
+            background: #fff3cd;
+            color: #856404;
+        }
 
-.hidden{
-    display:none
-}
+        .normal {
+            background: #d4edda;
+            color: #155724;
+        }
 
-#loading{
-    color:#2563eb;
-    font-weight:bold
-}
+        .high {
+            background: #f8d7da;
+            color: #721c24;
+        }
 
-@media(max-width:700px){
-    .grid{
-        grid-template-columns:1fr
-    }
-}
-</style>
+        .unknown {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .conflict {
+            background: #fff8e1;
+            border-left: 5px solid #ffb300;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 5px;
+        }
+
+        .summary {
+            background: #eef7ff;
+            padding: 18px;
+            border-radius: 10px;
+            line-height: 1.6;
+        }
+
+        .notice {
+            background: #fff3cd;
+            border-left: 5px solid #f0ad00;
+            padding: 15px;
+            border-radius: 7px;
+            line-height: 1.5;
+        }
+
+        .empty {
+            color: #68788a;
+        }
+
+        @media(max-width: 700px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .full {
+                grid-column: auto;
+            }
+
+            .header h1 {
+                font-size: 27px;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<header>
-<div class="logo">🩺 MedLens</div>
-<div class="tag">Clinical Information Intelligence</div>
-</header>
-
-<main>
-
-<div class="card">
-
-<h1>Patient Information</h1>
-
-<p>Provide the available patient context.</p>
-
-<div class="grid">
-
-<div>
-<label>Age</label>
-<input id="age" type="number">
+<div class="header">
+    <div class="header-inner">
+        <h1>🩺 MedLens</h1>
+        <p>AI-Powered Clinical Information Intelligence</p>
+    </div>
 </div>
 
-<div>
-<label>Sex</label>
-<input id="sex">
-</div>
+<div class="container">
 
-<div>
-<label>Symptoms</label>
-<input id="symptoms">
-</div>
+    <div class="card">
+        <h2>👤 Patient Information</h2>
 
-<div>
-<label>Existing Conditions</label>
-<input id="conditions">
-</div>
+        <div class="grid">
 
-<div>
-<label>Allergies</label>
-<input id="allergies">
-</div>
+            <div>
+                <label>Age</label>
+                <input id="age" type="number" min="0" max="150"
+                       placeholder="e.g. 21">
+            </div>
 
-<div>
-<label>Medications</label>
-<input id="medications">
-</div>
+            <div>
+                <label>Sex</label>
+                <select id="sex">
+                    <option value="">Select</option>
+                    <option>Male</option>
+                    <option>Female</option>
+                    <option>Other</option>
+                    <option>Prefer not to say</option>
+                </select>
+            </div>
 
-</div>
+            <div class="full">
+                <label>Symptoms</label>
+                <textarea id="symptoms"
+                    placeholder="Enter patient-reported symptoms"></textarea>
+            </div>
 
-<button onclick="processReport()">Process Medical Report</button>
+            <div>
+                <label>Known Conditions</label>
+                <textarea id="conditions"
+                    placeholder="Existing conditions"></textarea>
+            </div>
 
-</div>
+            <div>
+                <label>Allergies</label>
+                <textarea id="allergies"
+                    placeholder="Known allergies"></textarea>
+            </div>
 
+            <div class="full">
+                <label>Current Medications</label>
+                <textarea id="medications"
+                    placeholder="Current medications"></textarea>
+            </div>
 
-<div class="card">
-
-<h2>📄 Medical Report</h2>
-
-<div class="upload">
-
-<input id="report" type="file" accept=".pdf,.png,.jpg,.jpeg">
-
-<p>Upload a PDF or medical report image</p>
-
-</div>
-
-<p id="loading" class="hidden">
-⏳ MedLens is extracting and validating the report...
-</p>
-
-</div>
-
-
-<div id="results" class="hidden">
-
-<div class="card">
-
-<h2>📊 Structured Medical Record</h2>
-
-<div id="table"></div>
-
-</div>
+        </div>
+    </div>
 
 
-<div id="conflicts"></div>
+    <div class="card">
+        <h2>📄 Medical Report</h2>
+
+        <div class="upload">
+            <input
+                id="report"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+            >
+
+            <p>Upload a PDF or medical report image</p>
+            <small>Maximum file size: 8 MB</small>
+        </div>
+
+        <button id="processBtn" onclick="processReport()">
+            Process Medical Report
+        </button>
+
+        <div id="status" class="status"></div>
+    </div>
 
 
-<div class="card">
-
-<h2>🧠 Patient-Friendly Summary</h2>
-
-<div class="summary" id="summary"></div>
-
-<p class="source">
-Generated only from the provided patient information and uploaded report.
-</p>
-
-</div>
-
-
-<div class="card">
-
-<h3>🛡️ Responsible AI</h3>
-
-<p>
-MedLens organizes and summarizes medical information.
-It does not diagnose diseases, prescribe treatment,
-or recommend medication changes.
-</p>
+    <div id="results"></div>
 
 </div>
-
-</div>
-
-</main>
 
 
 <script>
 
-async function processReport(){
+function escapeHTML(value) {
+    if (value === null || value === undefined) return "";
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
-    const file=document.getElementById("report").files[0];
 
-    if(!file){
+function statusBadge(status) {
+
+    const value = String(status || "UNKNOWN").toUpperCase();
+
+    let cls = "unknown";
+
+    if (value === "LOW") cls = "low";
+    if (value === "NORMAL") cls = "normal";
+    if (value === "HIGH") cls = "high";
+
+    return `<span class="badge ${cls}">${escapeHTML(value)}</span>`;
+}
+
+
+async function processReport() {
+
+    const fileInput = document.getElementById("report");
+    const button = document.getElementById("processBtn");
+    const status = document.getElementById("status");
+    const results = document.getElementById("results");
+
+    if (!fileInput.files.length) {
         alert("Please upload a medical report first.");
         return;
     }
 
-    document.getElementById("loading").classList.remove("hidden");
-
-    const fd=new FormData();
-
-    fd.append("file",file);
-
-    fd.append("patient",JSON.stringify({
-
-        age:document.getElementById("age").value,
-
-        sex:document.getElementById("sex").value,
-
-        symptoms:document.getElementById("symptoms").value,
-
-        conditions:document.getElementById("conditions").value,
-
-        allergies:document.getElementById("allergies").value,
-
-        medications:document.getElementById("medications").value
-
-    }));
-
-
-    try{
-
-        const res=await fetch("/analyze",{
-            method:"POST",
-            body:fd
-        });
-
-        const data=await res.json();
-
-
-        if(data.error){
-
-            alert(data.error);
-
-            return;
-
-        }
-
-
-        let rows="";
-
-
-        (data.tests||[]).forEach(x=>{
-
-            let cls=(x.status||"UNKNOWN").toLowerCase();
-
-            rows+=`
-
-            <tr>
-
-            <td><b>${x.test_name||"Unknown"}</b></td>
-
-            <td>${x.value??"Not provided"}</td>
-
-            <td>${x.unit||""}</td>
-
-            <td>${x.reference_range||"Not provided"}</td>
-
-            <td>
-            <span class="badge ${cls}">
-            ${x.status||"UNKNOWN"}
-            </span>
-            </td>
-
-            <td class="source">
-            AI extracted<br>
-            ${x.source||"Uploaded report"}
-            </td>
-
-            </tr>
-
-            `;
-
-        });
-
-
-        document.getElementById("table").innerHTML=`
-
-        <table>
-
-        <tr>
-
-        <th>Test</th>
-        <th>Value</th>
-        <th>Unit</th>
-        <th>Reference Range</th>
-        <th>Status</th>
-        <th>Provenance</th>
-
-        </tr>
-
-        ${rows}
-
-        </table>
-
-        `;
-
-
-        let conflictHTML="";
-
-
-        (data.conflicts||[]).forEach(c=>{
-
-            conflictHTML+=`
-
-            <div class="card alert">
-
-            <b>⚠️ Information conflict</b>
-
-            <p>${c}</p>
-
-            </div>
-
-            `;
-
-        });
-
-
-        document.getElementById("conflicts").innerHTML=conflictHTML;
-
-
-        document.getElementById("summary").innerText=
-            data.summary||"No summary available.";
-
-
-        document.getElementById("results").classList.remove("hidden");
-
-
-    }catch(e){
-
-        alert("Something went wrong: "+e.message);
-
-    }finally{
-
-        document.getElementById("loading").classList.add("hidden");
-
+    const file = fileInput.files[0];
+
+    if (file.size > 8 * 1024 * 1024) {
+        alert("File is too large. Maximum allowed size is 8 MB.");
+        return;
     }
 
+    const patient = {
+        age: document.getElementById("age").value,
+        sex: document.getElementById("sex").value,
+        symptoms: document.getElementById("symptoms").value,
+        conditions: document.getElementById("conditions").value,
+        allergies: document.getElementById("allergies").value,
+        medications: document.getElementById("medications").value
+    };
+
+    const formData = new FormData();
+
+    formData.append("file", file);
+    formData.append("patient", JSON.stringify(patient));
+
+    button.disabled = true;
+    button.textContent = "Processing...";
+    status.textContent = "🔎 Reading and structuring the medical report...";
+    results.innerHTML = "";
+
+    try {
+
+        const response = await fetch("/analyze", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        renderResults(data);
+
+        status.textContent = "✅ Report processed successfully.";
+
+    } catch (error) {
+
+        alert(error.message || "Unable to process report.");
+
+        status.textContent = "❌ Processing failed.";
+
+    } finally {
+
+        button.disabled = false;
+        button.textContent = "Process Medical Report";
+    }
+}
+
+
+function renderResults(data) {
+
+    const results = document.getElementById("results");
+
+    let rows = "";
+
+    if (data.tests && data.tests.length) {
+
+        data.tests.forEach(test => {
+
+            rows += `
+            <tr>
+                <td>${escapeHTML(test.test_name)}</td>
+                <td>${escapeHTML(test.value)}</td>
+                <td>${escapeHTML(test.unit)}</td>
+                <td>${escapeHTML(test.reference_range)}</td>
+                <td>${statusBadge(test.status)}</td>
+                <td>${escapeHTML(test.date)}</td>
+                <td>${escapeHTML(test.observation)}</td>
+                <td>${escapeHTML(test.source)}</td>
+            </tr>
+            `;
+        });
+
+    } else {
+
+        rows = `
+        <tr>
+            <td colspan="8" class="empty">
+                No structured test results were extracted.
+            </td>
+        </tr>
+        `;
+    }
+
+
+    let conflicts = "";
+
+    if (data.conflicts && data.conflicts.length) {
+
+        data.conflicts.forEach(item => {
+
+            conflicts += `
+            <div class="conflict">
+                ⚠️ ${escapeHTML(item)}
+            </div>
+            `;
+        });
+
+    } else {
+
+        conflicts = `
+        <p class="empty">
+            No conflicts were detected in the supplied information.
+        </p>
+        `;
+    }
+
+
+    results.innerHTML = `
+
+    <div class="card">
+
+        <h2>📊 Structured Medical Record</h2>
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>Test</th>
+                        <th>Value</th>
+                        <th>Unit</th>
+                        <th>Reference Range</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Observation</th>
+                        <th>Source</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    ${rows}
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <div class="card">
+
+        <h2>⚠️ Conflict Detection</h2>
+
+        ${conflicts}
+
+    </div>
+
+
+    <div class="card">
+
+        <h2>🧠 Patient-Friendly Summary</h2>
+
+        <div class="summary">
+            ${escapeHTML(data.summary || "No summary generated.")}
+        </div>
+
+    </div>
+
+
+    <div class="card">
+
+        <h2>🔐 Responsible AI Notice</h2>
+
+        <div class="notice">
+
+            MedLens is an information-structuring and review-support
+            tool. It does not provide a medical diagnosis, prescribe
+            treatment, recommend medication changes, or determine
+            medication dosage.
+
+            <br><br>
+
+            Reference-range status is marked LOW, NORMAL, or HIGH only
+            when the uploaded report provides the relevant reference
+            range. Otherwise, the status is shown as UNKNOWN.
+
+            <br><br>
+
+            AI-extracted information should be reviewed by a qualified
+            human before clinical use.
+
+        </div>
+
+    </div>
+
+    `;
 }
 
 </script>
@@ -465,61 +563,212 @@ async function processReport(){
 """
 
 
+# ============================================================
+# HOME
+# ============================================================
+
 @app.get("/", response_class=HTMLResponse)
-def home():
+async def home():
     return HTML
 
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+def clean_json_text(text):
+
+    text = text.strip()
+
+    # Remove markdown code fences if model adds them
+    text = re.sub(r"^```json\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^```\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+
+    # Find the JSON object if extra text was added
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start != -1 and end != -1:
+        text = text[start:end + 1]
+
+    return text.strip()
+
+
+def make_data_url(file_bytes, mime_type):
+
+    encoded = base64.b64encode(file_bytes).decode("utf-8")
+
+    return f"data:{mime_type};base64,{encoded}"
+
+
+def normalize_result(data):
+
+    if not isinstance(data, dict):
+        data = {}
+
+    tests = data.get("tests", [])
+
+    if not isinstance(tests, list):
+        tests = []
+
+    normalized_tests = []
+
+    for test in tests:
+
+        if not isinstance(test, dict):
+            continue
+
+        status = str(test.get("status", "UNKNOWN")).upper()
+
+        if status not in ["LOW", "NORMAL", "HIGH", "UNKNOWN"]:
+            status = "UNKNOWN"
+
+        normalized_tests.append({
+            "test_name": str(test.get("test_name", "")),
+            "value": str(test.get("value", "")),
+            "unit": str(test.get("unit", "")),
+            "reference_range": str(test.get("reference_range", "")),
+            "status": status,
+            "date": str(test.get("date", "")),
+            "observation": str(test.get("observation", "")),
+            "source": str(test.get("source", "uploaded report"))
+        })
+
+    conflicts = data.get("conflicts", [])
+
+    if not isinstance(conflicts, list):
+        conflicts = [str(conflicts)]
+
+    conflicts = [str(x) for x in conflicts]
+
+    summary = str(data.get("summary", ""))
+
+    return {
+        "tests": normalized_tests,
+        "conflicts": conflicts,
+        "summary": summary
+    }
+
+
+# ============================================================
+# AI ANALYSIS
+# ============================================================
 
 @app.post("/analyze")
 async def analyze(
     file: UploadFile = File(...),
-    patient: str = Form(...)
+    patient: str = Form("{}")
 ):
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
 
     if not api_key:
         return {
-            "error": "GEMINI_API_KEY is not configured."
+            "error": "OPENROUTER_API_KEY is not configured in Render."
         }
 
+    # --------------------------------------------------------
+    # Validate file
+    # --------------------------------------------------------
 
-    data = await file.read()
+    allowed_types = {
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    }
 
+    mime_type = file.content_type or "application/octet-stream"
 
-    if len(data) > 8 * 1024 * 1024:
+    if mime_type not in allowed_types:
+
         return {
-            "error": "Please use a report smaller than 8 MB."
+            "error": "Unsupported file type. Please upload PDF, JPG, PNG, or WEBP."
+        }
+
+    file_bytes = await file.read()
+
+    if len(file_bytes) > 8 * 1024 * 1024:
+
+        return {
+            "error": "File is too large. Maximum allowed size is 8 MB."
         }
 
 
-    mime = file.content_type or "application/pdf"
+    # --------------------------------------------------------
+    # Parse patient information
+    # --------------------------------------------------------
 
+    try:
+        patient_data = json.loads(patient)
+    except Exception:
+        patient_data = {}
+
+
+    # --------------------------------------------------------
+    # Strict MedLens extraction instructions
+    # --------------------------------------------------------
 
     prompt = f"""
-You are MedLens, a clinical information organization assistant.
+You are the extraction engine for MedLens, a clinical information
+structuring application.
 
-PATIENT INFORMATION PROVIDED BY USER:
-{patient}
+Your job is NOT to diagnose the patient.
 
-Analyze the uploaded medical report.
+Your job is to read the uploaded medical report and convert the
+information into a structured medical record.
 
-IMPORTANT SAFETY RULES:
+PATIENT-PROVIDED INFORMATION:
+{json.dumps(patient_data, ensure_ascii=False)}
 
-1. Extract information only from the uploaded report.
-2. NEVER invent missing values.
-3. NEVER invent a reference range.
-4. Determine LOW, NORMAL or HIGH ONLY when the report itself provides a reference range.
-5. If no reference range exists, status MUST be "UNKNOWN".
-6. Distinguish report-extracted information from user-provided information.
-7. Detect contradictions between patient information and report information.
-8. Do NOT diagnose any disease.
-9. Do NOT recommend treatment.
-10. Do NOT recommend changing medication or dosage.
-11. Do not present uncertain information as fact.
-12. Create a concise patient-friendly informational summary.
+IMPORTANT SAFETY AND ACCURACY RULES:
 
-Return ONLY valid JSON using exactly this structure:
+1. Extract medical test information ONLY from the uploaded report.
+
+2. NEVER invent a laboratory value.
+
+3. NEVER invent a unit.
+
+4. NEVER invent a date.
+
+5. NEVER invent a reference range.
+
+6. If the report does not provide a reference range for a test,
+   set reference_range to an empty string and status to UNKNOWN.
+
+7. LOW, NORMAL, or HIGH may ONLY be assigned when the uploaded
+   report itself provides a reference range that allows that
+   classification.
+
+8. Do not use general medical knowledge to create reference ranges.
+
+9. Do not diagnose any disease or medical condition.
+
+10. Do not prescribe treatment.
+
+11. Do not recommend changing medication or dosage.
+
+12. Do not present uncertain information as fact.
+
+13. If text is unclear or unreadable, leave the field empty or
+    mark the relevant information as UNKNOWN.
+
+14. Clearly distinguish information extracted from the uploaded
+    report from information supplied by the patient.
+
+15. Detect obvious contradictions inside the supplied information
+    and list them under conflicts.
+
+16. Produce a concise, patient-friendly summary describing what
+    information is present in the report. Do not give a diagnosis
+    or treatment advice.
+
+OUTPUT FORMAT:
+
+Return ONLY valid JSON.
+
+Use exactly this structure:
 
 {{
   "tests": [
@@ -534,97 +783,167 @@ Return ONLY valid JSON using exactly this structure:
       "source": "uploaded report"
     }}
   ],
-  "conflicts": ["string"],
+  "conflicts": [
+    "string"
+  ],
   "summary": "string"
 }}
 
-The reference_range field must contain the range exactly as reported
-or "Not provided".
+Do not wrap the JSON in markdown.
 """
 
 
-    encoded = base64.b64encode(data).decode("utf-8")
+    # --------------------------------------------------------
+    # Convert uploaded file
+    # --------------------------------------------------------
+
+    data_url = make_data_url(file_bytes, mime_type)
 
 
-    # Gemini model updated for new users
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-3.6-flash:generateContent?key="
-        + api_key
-    )
+    # --------------------------------------------------------
+    # OpenRouter request
+    # --------------------------------------------------------
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+
+    if mime_type == "application/pdf":
+
+        content = [
+            {
+                "type": "text",
+                "text": prompt
+            },
+            {
+                "type": "file",
+                "file": {
+                    "filename": file.filename or "medical_report.pdf",
+                    "file_data": data_url
+                }
+            }
+        ]
+
+    else:
+
+        content = [
+            {
+                "type": "text",
+                "text": prompt
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": data_url
+                }
+            }
+        ]
 
 
     payload = {
-
-        "contents": [
-
+        "model": "openrouter/free",
+        "messages": [
             {
-
-                "parts": [
-
-                    {
-                        "text": prompt
-                    },
-
-                    {
-                        "inline_data": {
-                            "mime_type": mime,
-                            "data": encoded
-                        }
-                    }
-
-                ]
-
+                "role": "user",
+                "content": content
             }
-
-        ],
-
-        "generationConfig": {
-
-            "responseMimeType": "application/json"
-
-        }
-
+        ]
     }
 
 
     try:
 
-        r = requests.post(
-            url,
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
             json=payload,
             timeout=120
         )
 
 
-        if not r.ok:
+        if not response.ok:
 
             return {
-                "error":
-                f"Gemini API error {r.status_code}: "
-                f"{r.text[:1000]}"
+                "error": (
+                    f"OpenRouter API error {response.status_code}: "
+                    f"{response.text[:1500]}"
+                )
             }
 
 
-        r.raise_for_status()
-
-        result = r.json()
+        result = response.json()
 
 
-        text = (
-            result["candidates"][0]
-            ["content"]["parts"][0]["text"]
-        )
+        choices = result.get("choices", [])
+
+        if not choices:
+
+            return {
+                "error": "OpenRouter returned no model response."
+            }
 
 
-        return json.loads(text)
+        message = choices[0].get("message", {})
 
+        content = message.get("content", "")
+
+
+        # Some models can return content as a list.
+        if isinstance(content, list):
+
+            parts = []
+
+            for item in content:
+
+                if isinstance(item, dict):
+
+                    if "text" in item:
+                        parts.append(str(item["text"]))
+
+                else:
+                    parts.append(str(item))
+
+            content = "".join(parts)
+
+
+        content = str(content)
+
+        cleaned = clean_json_text(content)
+
+
+        try:
+
+            parsed = json.loads(cleaned)
+
+        except Exception:
+
+            return {
+                "error": (
+                    "The AI returned an unexpected format. "
+                    f"Raw response: {content[:1500]}"
+                )
+            }
+
+
+        return normalize_result(parsed)
+
+
+    except requests.exceptions.Timeout:
+
+        return {
+            "error": "OpenRouter request timed out. Please try again."
+        }
+
+    except requests.exceptions.RequestException as e:
+
+        return {
+            "error": f"Network error while contacting OpenRouter: {str(e)[:500]}"
+        }
 
     except Exception as e:
 
         return {
-            "error":
-            f"AI processing failed: "
-            f"{type(e).__name__}: "
-            f"{str(e)[:500]}"
+            "error": f"AI processing failed: {type(e).__name__}: {str(e)[:500]}"
         }
